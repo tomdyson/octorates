@@ -118,4 +118,4 @@ To set up CI/CD for your fork of this project:
 
 ## License
 
-[Your chosen license]
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
