@@ -41,7 +41,7 @@ Thumbs.db
 *.sqlite
 
 # Fly.io
-fly.toml
+#fly.toml
 
 # Environment variables
 .env
