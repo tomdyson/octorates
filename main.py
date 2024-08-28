@@ -48,25 +48,36 @@ async def all_slots():
         for slot in sorted_slots
     ]
 
-@app.get("/api/cheapest_slots/{count}")
-async def cheapest_slots(count: int):
+def validate_count(count: int):
     if count < 1 or count > 48:
         raise HTTPException(status_code=400, detail="Count must be between 1 and 48")
+
+def get_cheapest_slots(slots, count: int):
+    # Sort slots by price (value including VAT) in ascending order
+    sorted_slots = sorted(slots, key=lambda x: x["value_inc_vat"])
     
-    data = await get_cached_data()
-    sorted_slots = sorted(data["results"], key=lambda x: x["value_inc_vat"])
+    # Select the 'count' number of cheapest slots
     cheapest = sorted_slots[:count]
+    
+    # Sort the cheapest slots chronologically by their valid_from time
     chronological_cheapest = sorted(cheapest, key=lambda x: x["valid_from"])
+    
+    # Return a list of dictionaries, each representing a slot
+    # Exclude the 'payment_method' key from each slot dictionary
     return [
         {k: v for k, v in slot.items() if k != "payment_method"}
         for slot in chronological_cheapest
     ]
 
+@app.get("/api/cheapest_slots/{count}")
+async def cheapest_slots(count: int):
+    validate_count(count)
+    data = await get_cached_data()
+    return get_cheapest_slots(data["results"], count)
+
 @app.get("/api/cheapest_slots_tomorrow/{count}")
 async def cheapest_slots_tomorrow(count: int):
-    if count < 1 or count > 48:
-        raise HTTPException(status_code=400, detail="Count must be between 1 and 48")
-    
+    validate_count(count)
     data = await get_cached_data()
     
     # Get tomorrow's date
@@ -83,14 +94,7 @@ async def cheapest_slots_tomorrow(count: int):
     if not tomorrow_slots:
         return []
 
-    sorted_slots = sorted(tomorrow_slots, key=lambda x: x["value_inc_vat"])
-    cheapest = sorted_slots[:count]
-    chronological_cheapest = sorted(cheapest, key=lambda x: x["valid_from"])
-    
-    return [
-        {k: v for k, v in slot.items() if k != "payment_method"}
-        for slot in chronological_cheapest
-    ]
+    return get_cheapest_slots(tomorrow_slots, count)
 
 @app.get("/")
 async def root(request: Request):
