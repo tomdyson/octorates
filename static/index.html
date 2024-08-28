@@ -46,15 +46,15 @@
             <div v-if="showApiDetails">
                 <div class="mb4">
                     <p class="mb2">Return all upcoming slots:</p>
-                    <pre class="bg-near-white pa2 br2 overflow-auto"><code>GET /api/all_slots</code></pre>
+                    <pre class="bg-near-white pa2 br2 overflow-auto"><code>GET https://octorates.tomd.org/api/all_slots</code></pre>
                 </div>
                 <div class="mb4">
                     <p class="mb2">Return a specified number of cheapest upcoming slots:</p>
-                    <pre class="bg-near-white pa2 br2 overflow-auto"><code>GET /api/cheapest_slots/10</code></pre>
+                    <pre class="bg-near-white pa2 br2 overflow-auto"><code>GET https://octorates.tomd.org/api/cheapest_slots/10</code></pre>
                 </div>
                 <div class="mb4">
                     <p class="mb2">Return a specified number of cheapest slots for tomorrow:</p>
-                    <pre class="bg-near-white pa2 br2 overflow-auto"><code>GET /api/cheapest_slots_tomorrow/10</code></pre>
+                    <pre class="bg-near-white pa2 br2 overflow-auto"><code>GET https://octorates.tomd.org/api/cheapest_slots_tomorrow/10</code></pre>
                 </div>
                 <p class="f6 i">All endpoints return JSON with slot data including time and price. 
                     Slots are returned in chronological order.</p>
