@@ -22,7 +22,7 @@ OctoRates is a web application that displays Octopus Agile electricity rates, al
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/octorates.git
+   git clone https://github.com/tomdyson/octorates.git
    cd octorates
    ```
 
