@@ -2,7 +2,8 @@ import urllib.parse
 from datetime import datetime, timedelta, timezone
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
@@ -92,5 +93,5 @@ async def cheapest_slots_tomorrow(count: int):
     ]
 
 @app.get("/")
-async def root():
-    return {"message": "Welcome to OctoRates - the Octopus Energy API viewer"}
+async def root(request: Request):
+    return FileResponse("static/index.html")
