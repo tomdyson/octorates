@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OctoRates - Octopus Agile Rates Viewer</title>
+    <link rel="stylesheet" href="https://unpkg.com/tachyons@4.12.0/css/tachyons.min.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body class="bg-light-gray sans-serif">
+    <div id="app" class="mw7 center pa3">
+        <h1 class="f2 lh-title mb4">Octopus Agile Rates</h1>
+        <div class="mb4">
+            <div class="mb3">
+                <button @click="fetchAllSlots" class="f6 link dim br2 ph3 pv2 dib white bg-blue mr2">All Slots</button>
+                <button @click="fetchCheapestSlots" class="f6 link dim br2 ph3 pv2 dib white bg-dark-green mr2">Cheapest Slots</button>
+                <button @click="fetchCheapestSlotsTomorrow" class="f6 link dim br2 ph3 pv2 dib white bg-dark-blue">Cheapest Tomorrow</button>
+            </div>
+            <div class="flex items-center">
+                <label for="cheapestCount" class="mr2">Number of slots:</label>
+                <input id="cheapestCount" v-model.number="cheapestCount" type="number" min="1" max="48" class="f6 input-reset ba b--black-20 pa2 w3">
+            </div>
+        </div>
+        <div v-if="Object.keys(slots).length" class="mt4">
+            <h2 class="f3 lh-title mb3">{{ title }}</h2>
+            <div v-for="(dateSlots, date) in slots" :key="date" class="mb4">
+                <h3 class="f4 lh-title mb2 bg-light-blue pa2">{{ date }}</h3>
+                <ul class="list pl0">
+                    <li v-for="slot in dateSlots" :key="slot.time" 
+                        class="flex items-center justify-between pa2 bb b--light-silver"
+                        :class="slot.colorClass">
+                        <span class="f5">{{ slot.time }}</span>
+                        <span class="f5 b">{{ slot.value }}p</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- API Section -->
+        <div class="">
+            <h2 class="f3 lh-title mb3 flex items-center">
+                API Endpoints
+                <a href="#" @click.prevent="toggleApiDetails" class="f6 link dim ba ph2 pv1 ml2 near-black">?</a>
+            </h2>
+            <div v-if="showApiDetails">
+                <div class="mb4">
+                    <p class="mb2">Return all upcoming slots in chronological order:</p>
+                    <pre class="bg-near-white pa2 br2 overflow-auto"><code>GET /api/all_slots</code></pre>
+                </div>
+                <div class="mb4">
+                    <p class="mb2">Return a specified number of cheapest upcoming slots in chronological order:</p>
+                    <pre class="bg-near-white pa2 br2 overflow-auto"><code>GET /api/cheapest_slots/10</code></pre>
+                </div>
+                <div class="mb4">
+                    <p class="mb2">Return a specified number of cheapest slots for tomorrow in chronological order:</p>
+                    <pre class="bg-near-white pa2 br2 overflow-auto"><code>GET /api/cheapest_slots_tomorrow/10</code></pre>
+                </div>
+                <p class="f6 i">Note: All endpoints return JSON data with slot information including time and price.</p>
+            </div>
+        </div>
+    </div>
+    <script src="/static/app.js"></script>
+</body>
+</html>
