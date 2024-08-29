@@ -101,3 +101,100 @@ async def test_all_slots(mock_octopus_data):
             response = await ac.get("/api/all_slots")
             assert response.status_code == 200
             assert response.headers["CACHE_STATUS"] == "MISS"
+
+@pytest.mark.asyncio
+async def test_cheapest_slots(mock_octopus_data):
+    async def mock_get_cached_data():
+        return mock_octopus_data, True
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        with patch('main.get_cached_data', new=mock_get_cached_data):
+            response = await ac.get("/api/cheapest_slots/1")
+            assert response.status_code == 200
+            data = response.json()
+            assert len(data) == 1
+            assert data[0]["value_inc_vat"] == 12  # The cheapest slot
+            assert "payment_method" not in data[0]
+            assert response.headers["CACHE_STATUS"] == "HIT"
+
+            # Test with a different count
+            response = await ac.get("/api/cheapest_slots/2")
+            assert response.status_code == 200
+            data = response.json()
+            assert len(data) == 2
+            assert data[0]["value_inc_vat"] == 12
+            assert data[1]["value_inc_vat"] == 18
+
+        # Test invalid count
+        response = await ac.get("/api/cheapest_slots/0")
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Count must be between 1 and 48"
+
+        response = await ac.get("/api/cheapest_slots/49")
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Count must be between 1 and 48"
+
+@pytest.mark.asyncio
+async def test_cheapest_slots_tomorrow(mock_octopus_data):
+    async def mock_get_cached_data():
+        return mock_octopus_data, True
+
+    tomorrow = datetime.now(timezone.utc).date() + timedelta(days=1)
+    tomorrow_start = datetime.combine(tomorrow, datetime.min.time()).replace(tzinfo=timezone.utc)
+
+    # Modify mock data to include tomorrow's slots
+    mock_octopus_data_tomorrow = mock_octopus_data.copy()
+    mock_octopus_data_tomorrow["results"] = [
+        {
+            "value_exc_vat": 8,
+            "value_inc_vat": 9.6,
+            "valid_from": (tomorrow_start + timedelta(hours=1)).isoformat().replace("+00:00", "Z"),
+            "valid_to": (tomorrow_start + timedelta(hours=1, minutes=30)).isoformat().replace("+00:00", "Z")
+        },
+        {
+            "value_exc_vat": 12,
+            "value_inc_vat": 14.4,
+            "valid_from": (tomorrow_start + timedelta(hours=2)).isoformat().replace("+00:00", "Z"),
+            "valid_to": (tomorrow_start + timedelta(hours=2, minutes=30)).isoformat().replace("+00:00", "Z")
+        }
+    ]
+
+    async def mock_get_cached_data_tomorrow():
+        return mock_octopus_data_tomorrow, True
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        with patch('main.get_cached_data', new=mock_get_cached_data_tomorrow):
+            response = await ac.get("/api/cheapest_slots_tomorrow/1")
+            assert response.status_code == 200
+            data = response.json()
+            assert len(data) == 1
+            assert data[0]["value_inc_vat"] == 9.6  # The cheapest slot for tomorrow
+            assert "payment_method" not in data[0]
+            assert response.headers["CACHE_STATUS"] == "HIT"
+
+            # Test with a different count
+            response = await ac.get("/api/cheapest_slots_tomorrow/2")
+            assert response.status_code == 200
+            data = response.json()
+            assert len(data) == 2
+            assert data[0]["value_inc_vat"] == 9.6
+            assert data[1]["value_inc_vat"] == 14.4
+
+        # Test with no slots for tomorrow
+        async def mock_get_cached_data_no_tomorrow():
+            return mock_octopus_data, True
+
+        with patch('main.get_cached_data', new=mock_get_cached_data_no_tomorrow):
+            response = await ac.get("/api/cheapest_slots_tomorrow/1")
+            assert response.status_code == 200
+            data = response.json()
+            assert len(data) == 0
+
+        # Test invalid count
+        response = await ac.get("/api/cheapest_slots_tomorrow/0")
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Count must be between 1 and 48"
+
+        response = await ac.get("/api/cheapest_slots_tomorrow/49")
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Count must be between 1 and 48"
