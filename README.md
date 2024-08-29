@@ -119,3 +119,31 @@ To set up CI/CD for your fork of this project:
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+## Running Tests
+
+To run the tests for this project, follow these steps:
+
+1. Install the required testing dependencies:
+   ```
+   pip install pytest pytest-asyncio httpx
+   ```
+
+2. Run the tests using pytest:
+   ```
+   pytest
+   ```
+
+This will run all the tests in the `test_main.py` file and display the results.
+
+To run tests with more detailed output, use the `-v` flag:
+   ```
+   pytest -v
+   ```
+
+To run a specific test function, use the `-k` flag followed by the test function name:
+   ```
+   pytest -v -k test_all_slots
+   ```
+
+Make sure to run the tests before deploying any changes to ensure that all functionality is working as expected.
