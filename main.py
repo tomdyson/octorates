@@ -96,10 +96,7 @@ async def cheapest_slots_tomorrow(count: int, response: Response):
         if tomorrow_start <= datetime.fromisoformat(slot["valid_from"]) < tomorrow_end
     ]
 
-    if not tomorrow_slots:
-        return []
-
-    return get_cheapest_slots(tomorrow_slots, count)
+    return get_cheapest_slots(tomorrow_slots, count) if tomorrow_slots else []
 
 @app.get("/")
 async def root(request: Request):
