@@ -33,10 +33,10 @@
         <div v-if="Object.keys(slots).length" class="mt4">
             <h2 class="f3 lh-title mb3">{{ title }}</h2>
             <div v-for="(dateSlots, date) in slots" :key="date" class="mb4">
-                <h3 class="f4 lh-title mb2 bg-light-blue pa2">{{ date }}</h3>
+                <h3 class="f4 lh-title mb2 bg-light-blue pa2 ">{{ date }}</h3>
                 <ul class="list pl0">
                     <li v-for="slot in dateSlots" :key="slot.time" 
-                        class="flex items-center justify-between pa2 bb b--light-silver"
+                        class="flex items-center justify-between pa2"
                         :class="slot.colorClass">
                         <span class="f5">{{ slot.time }}</span>
                         <span class="f5 b">{{ slot.value }}p</span>
