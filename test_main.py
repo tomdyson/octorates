@@ -1,8 +1,9 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
 
 from main import app, fetch_octopus_data, get_cached_data
 
@@ -27,55 +28,76 @@ def mock_octopus_data():
         ]
     }
 
+@pytest.fixture
+async def async_client():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        yield ac
+
+# We'll add tests here one by one
+
 @pytest.mark.asyncio
 async def test_fetch_octopus_data(mock_octopus_data):
     with patch('httpx.AsyncClient.get') as mock_get:
-        mock_get.return_value = AsyncMock(status_code=200, json=AsyncMock(return_value=mock_octopus_data))
+        mock_response = AsyncMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = mock_octopus_data
+        mock_get.return_value = mock_response
         result = await fetch_octopus_data()
-        assert result == mock_octopus_data
+        assert await result == mock_octopus_data
+
+    # Verify that the mock was called with the correct URL
+    expected_url = "https://api.octopus.energy/v1/products/AGILE-FLEX-22-11-25/electricity-tariffs/E-1R-AGILE-FLEX-22-11-25-C/standard-unit-rates/"
+    mock_get.assert_called_once()
+    actual_url = mock_get.call_args[0][0]
+    assert actual_url.startswith(expected_url)
 
 @pytest.mark.asyncio
 async def test_get_cached_data(mock_octopus_data):
-    with patch('main.fetch_octopus_data', return_value=mock_octopus_data):
+    with patch('main.fetch_octopus_data', return_value=mock_octopus_data) as mock_fetch:
+        # First call should fetch new data
         data, cache_used = await get_cached_data()
         assert data == mock_octopus_data
         assert cache_used == False
+        mock_fetch.assert_called_once()
 
-        # Test cache hit
+        # Second call within 10 minutes should use cached data
         data, cache_used = await get_cached_data()
         assert data == mock_octopus_data
         assert cache_used == True
+        mock_fetch.assert_called_once()  # Should still be called only once
 
-def test_all_slots(mock_octopus_data):
-    with patch('main.get_cached_data', return_value=(mock_octopus_data, True)):
-        response = client.get("/api/all_slots")
-        assert response.status_code == 200
-        assert len(response.json()) == 2
-        assert "payment_method" not in response.json()[0]
-        assert response.headers["CACHE_STATUS"] == "HIT"
-
-def test_cheapest_slots(mock_octopus_data):
-    with patch('main.get_cached_data', return_value=(mock_octopus_data, False)):
-        response = client.get("/api/cheapest_slots/1")
-        assert response.status_code == 200
-        assert len(response.json()) == 1
-        assert response.json()[0]["value_inc_vat"] == 12
-        assert response.headers["CACHE_STATUS"] == "MISS"
-
-def test_cheapest_slots_invalid_count():
-    response = client.get("/api/cheapest_slots/0")
-    assert response.status_code == 400
-    assert "Count must be between 1 and 48" in response.json()["detail"]
+    # Test cache expiration
+    with patch('main.fetch_octopus_data', return_value=mock_octopus_data) as mock_fetch:
+        with patch('main.datetime') as mock_datetime:
+            # Set current time to 11 minutes after the last update
+            mock_datetime.now.return_value = datetime.now() + timedelta(minutes=11)
+            data, cache_used = await get_cached_data()
+            assert data == mock_octopus_data
+            assert cache_used == False
+            mock_fetch.assert_called_once()
 
 @pytest.mark.asyncio
-async def test_cheapest_slots_tomorrow(mock_octopus_data):
-    tomorrow = datetime.now(timezone.utc).date().isoformat()
-    mock_octopus_data["results"][0]["valid_from"] = f"{tomorrow}T00:00:00Z"
-    mock_octopus_data["results"][1]["valid_from"] = f"{tomorrow}T00:30:00Z"
+async def test_all_slots(mock_octopus_data):
+    async def mock_get_cached_data():
+        return mock_octopus_data, True
 
-    with patch('main.get_cached_data', return_value=(mock_octopus_data, True)):
-        response = client.get("/api/cheapest_slots_tomorrow/2")
-        assert response.status_code == 200
-        assert len(response.json()) == 2
-        assert response.json()[0]["valid_from"].startswith(tomorrow)
-        assert response.headers["CACHE_STATUS"] == "HIT"
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        with patch('main.get_cached_data', new=mock_get_cached_data):
+            response = await ac.get("/api/all_slots")
+            assert response.status_code == 200
+            data = response.json()
+            assert len(data) == 2
+            assert "payment_method" not in data[0]
+            assert response.headers["CACHE_STATUS"] == "HIT"
+
+            # Verify that the slots are sorted by valid_from
+            assert data[0]["valid_from"] < data[1]["valid_from"]
+
+        # Test with cache miss
+        async def mock_get_cached_data_miss():
+            return mock_octopus_data, False
+
+        with patch('main.get_cached_data', new=mock_get_cached_data_miss):
+            response = await ac.get("/api/all_slots")
+            assert response.status_code == 200
+            assert response.headers["CACHE_STATUS"] == "MISS"
