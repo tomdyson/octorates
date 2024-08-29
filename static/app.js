@@ -89,9 +89,10 @@ new Vue({
                 ])
             );
 
-            // Get today's and tomorrow's dates
-            const today = new Date().toLocaleDateString();
-            const tomorrow = new Date(new Date().setDate(new Date().getDate() + 1)).toLocaleDateString();
+            // Cache the current date
+            const currentDate = new Date();
+            const today = currentDate.toLocaleDateString();
+            const tomorrow = new Date(currentDate.setDate(currentDate.getDate() + 1)).toLocaleDateString();
 
             // Group slots by date and assign colors
             const grouped = {};

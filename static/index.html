@@ -4,17 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OctoRates - Octopus Agile Rates Viewer</title>
-    <link rel="stylesheet" href="https://unpkg.com/tachyons@4.12.0/css/tachyons.min.css"/>
-    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <style>
-        @media screen and (max-width: 30em) {
-            body { padding: 0.5rem; }
-            #app { padding: 0.5rem; }
-            .mw6 { max-width: 100%; }
-            pre { white-space: pre-wrap; word-break: break-all; }
-        }
-    </style>
+    <!-- Move the following link to the end of the body -->
 </head>
 <body class="bg-light-gray sans-serif">
     <div id="app" class="mw6 center pa3">
@@ -27,7 +17,7 @@
             </div>
             <div class="flex items-center">
                 <label for="cheapestCount" class="mr2">Number of slots:</label>
-                <input id="cheapestCount" v-model.number="cheapestCount" @change="updateUrl" type="number" min="1" max="48" class="f6 input-reset ba b--black-20 pa2 w3">
+                <input id="cheapestCount" v-model.number="cheapestCount" @change="updateUrl" type="number" min="1" max="48" class="f6 input-reset ba b--black-20 pa2 w3" aria-label="Number of slots">
             </div>
         </div>
         <div v-if="Object.keys(slots).length" class="mt4">
@@ -70,6 +60,17 @@
             </div>
         </div>
     </div>
-    <script src="/static/app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js" defer></script>
+    <script src="/static/app.js" defer></script>
+    <link rel="stylesheet" href="https://unpkg.com/tachyons@4.12.0/css/tachyons.min.css"/>
+    <style>
+        @media screen and (max-width: 30em) {
+            body { padding: 0.5rem; }
+            #app { padding: 0.5rem; }
+            .mw6 { max-width: 100%; }
+            pre { white-space: pre-wrap; word-break: break-all; }
+        }
+    </style>
 </body>
 </html>

@@ -5,8 +5,25 @@ import httpx
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.types import ASGIApp
+
+
+class CacheControlMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app: ASGIApp, cache_time: int = 3600):
+        super().__init__(app)
+        self.cache_time = cache_time
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        if request.url.path.startswith("/static"):
+            response.headers["Cache-Control"] = f"public, max-age={self.cache_time}"
+        return response
 
 app = FastAPI()
+
+# Add the CacheControlMiddleware
+app.add_middleware(CacheControlMiddleware, cache_time=3600)  # Cache for 1 hour
 
 # Serve static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
