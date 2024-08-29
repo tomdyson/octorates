@@ -95,7 +95,7 @@ To set up CI/CD for your fork of this project:
 ## Technologies Used
 
 - Backend: Python, FastAPI
-- Frontend: HTML, CSS (Tachyons), JavaScript (Vue.js)
+- Frontend: HTML, CSS (Tachyons), JavaScript (Alpine.js)
 - HTTP Client: Axios (frontend), HTTPX (backend)
 - Deployment: Docker, fly.io
 - CI/CD: GitHub Actions
@@ -103,15 +103,14 @@ To set up CI/CD for your fork of this project:
 ## File Structure
 
 - `main.py`: FastAPI backend server
-- `static/index.html`: Main HTML file
-- `static/app.js`: Vue.js frontend application
+- `static/index.html`: Main HTML file with Alpine.js frontend application
 - `Dockerfile`: Docker configuration for deployment
 - `.github/workflows/deploy.yml`: GitHub Actions workflow for CI/CD
 
 ## Notes
 
 - The application caches Octopus API data for 10 minutes to reduce API calls
-- The frontend uses Vue.js for reactive updates and Axios for API requests
+- The frontend uses Alpine.js for reactive updates and Axios for API requests
 - The backend uses FastAPI for efficient API routing and HTTPX for asynchronous HTTP requests
 - The app is containerized using Docker for easy deployment to fly.io
 - The application is automatically deployed to fly.io when changes are pushed to the main branch

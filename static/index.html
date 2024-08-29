@@ -3,45 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OctoRates - Octopus Agile Rates Viewer</title>
-    <!-- Move the following link to the end of the body -->
+    <title>OctoRates - Octopus Agile Rates Viewer (Alpine.js)</title>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/tachyons@4.12.0/css/tachyons.min.css"/>
+    <style>
+        @media screen and (max-width: 30em) {
+            body { padding: 0.5rem; }
+            #app { padding: 0.5rem; }
+            .mw6 { max-width: 100%; }
+            pre { white-space: pre-wrap; word-break: break-all; }
+        }
+    </style>
 </head>
 <body class="bg-light-gray sans-serif">
-    <div id="app" class="mw6 center pa3">
+    <div id="app" class="mw6 center pa3" x-data="octoRates()">
         <h1 class="f2 lh-title mb4">Octopus Agile Rates</h1>
         <div class="mb4">
             <div class="mb3 flex flex-wrap">
-                <button @click="fetchAllSlots" class="f6 link dim br2 ph3 pv2 dib white bg-blue mr2 mb2">All Slots</button>
-                <button @click="fetchCheapestSlots" class="f6 link dim br2 ph3 pv2 dib white bg-dark-green mr2 mb2">Cheapest Slots</button>
-                <button @click="fetchCheapestSlotsTomorrow" class="f6 link dim br2 ph3 pv2 dib white bg-dark-blue mb2">Cheapest Tomorrow</button>
+                <button @click="fetchAllSlots()" class="f6 link dim br2 ph3 pv2 dib white bg-blue mr2 mb2">All Slots</button>
+                <button @click="fetchCheapestSlots()" class="f6 link dim br2 ph3 pv2 dib white bg-dark-green mr2 mb2">Cheapest Slots</button>
+                <button @click="fetchCheapestSlotsTomorrow()" class="f6 link dim br2 ph3 pv2 dib white bg-dark-blue mb2">Cheapest Tomorrow</button>
             </div>
             <div class="flex items-center">
                 <label for="cheapestCount" class="mr2">Number of slots:</label>
-                <input id="cheapestCount" v-model.number="cheapestCount" @change="updateUrl" type="number" min="1" max="48" class="f6 input-reset ba b--black-20 pa2 w3" aria-label="Number of slots">
+                <input id="cheapestCount" x-model.number="cheapestCount" @change="updateUrl()" type="number" min="1" max="48" class="f6 input-reset ba b--black-20 pa2 w3" aria-label="Number of slots">
             </div>
         </div>
-        <div v-if="Object.keys(slots).length" class="mt4">
-            <h2 class="f3 lh-title mb3">{{ title }}</h2>
-            <div v-for="(dateSlots, date) in slots" :key="date" class="mb4">
-                <h3 class="f4 lh-title mb2 bg-light-blue pa2 ">{{ date }}</h3>
-                <ul class="list pl0">
-                    <li v-for="slot in dateSlots" :key="slot.time" 
-                        class="flex items-center justify-between pa2"
-                        :class="slot.colorClass">
-                        <span class="f5">{{ slot.time }}</span>
-                        <span class="f5 b">{{ slot.value }}p</span>
-                    </li>
-                </ul>
-            </div>
+        <div x-show="Object.keys(slots).length" class="mt4">
+            <h2 class="f3 lh-title mb3" x-text="title"></h2>
+            <template x-for="(dateSlots, date) in slots" :key="date">
+                <div class="mb4">
+                    <h3 class="f4 lh-title mb2 bg-light-blue pa2" x-text="date"></h3>
+                    <ul class="list pl0">
+                        <template x-for="slot in dateSlots" :key="slot.time">
+                            <li class="flex items-center justify-between pa2" :class="slot.colorClass">
+                                <span class="f5" x-text="slot.time"></span>
+                                <span class="f5 b" x-text="slot.value + 'p'"></span>
+                            </li>
+                        </template>
+                    </ul>
+                </div>
+            </template>
         </div>
 
         <!-- API Section -->
         <div class="">
             <h2 class="f3 lh-title mb3 flex items-center">
                 API Endpoints
-                <a href="#" @click.prevent="toggleApiDetails" class="f6 link dim ba ph2 pv1 ml2 near-black">?</a>
+                <a href="#" @click.prevent="toggleApiDetails()" class="f6 link dim ba ph2 pv1 ml2 near-black">?</a>
             </h2>
-            <div v-if="showApiDetails">
+            <div x-show="showApiDetails">
                 <div class="mb4">
                     <p class="mb2">Return all upcoming slots:</p>
                     <pre class="bg-near-white pa2 br2 overflow-auto"><code>GET https://octorates.tomd.org/api/all_slots</code></pre>
@@ -60,17 +72,145 @@
             </div>
         </div>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.min.js" defer></script>
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js" defer></script>
-    <script src="/static/app.js" defer></script>
-    <link rel="stylesheet" href="https://unpkg.com/tachyons@4.12.0/css/tachyons.min.css"/>
-    <style>
-        @media screen and (max-width: 30em) {
-            body { padding: 0.5rem; }
-            #app { padding: 0.5rem; }
-            .mw6 { max-width: 100%; }
-            pre { white-space: pre-wrap; word-break: break-all; }
+
+    <script>
+        function octoRates() {
+            return {
+                slots: [],
+                cheapestCount: 10,
+                title: '',
+                showApiDetails: false,
+                view: 'all',
+
+                init() {
+                    this.loadFromUrl();
+                    window.addEventListener('popstate', () => this.loadFromUrl());
+                },
+
+                async fetchAllSlots() {
+                    try {
+                        const response = await axios.get('/api/all_slots');
+                        this.slots = this.groupAndColorSlots(response.data);
+                        this.title = 'All upcoming slots';
+                        this.view = 'all';
+                        this.updateUrl();
+                    } catch (error) {
+                        console.error('Error fetching all slots:', error);
+                    }
+                },
+
+                async fetchCheapestSlots() {
+                    try {
+                        const response = await axios.get(`/api/cheapest_slots/${this.cheapestCount}`);
+                        this.slots = this.groupAndColorSlots(response.data);
+                        this.title = `${this.cheapestCount} cheapest upcoming slots`;
+                        this.view = 'cheapest';
+                        this.updateUrl();
+                    } catch (error) {
+                        console.error('Error fetching cheapest slots:', error);
+                    }
+                },
+
+                async fetchCheapestSlotsTomorrow() {
+                    try {
+                        const response = await axios.get(`/api/cheapest_slots_tomorrow/${this.cheapestCount}`);
+                        this.slots = this.groupAndColorSlots(response.data);
+                        this.title = `${this.cheapestCount} cheapest slots for tomorrow only`;
+                        this.view = 'tomorrow';
+                        this.updateUrl();
+                    } catch (error) {
+                        console.error('Error fetching cheapest slots for tomorrow:', error);
+                    }
+                },
+
+                updateUrl() {
+                    const url = new URL(window.location);
+                    if (this.view !== 'all') {
+                        url.searchParams.set('view', this.view);
+                    } else {
+                        url.searchParams.delete('view');
+                    }
+                    if (this.cheapestCount !== 10) {
+                        url.searchParams.set('count', this.cheapestCount);
+                    } else {
+                        url.searchParams.delete('count');
+                    }
+                    window.history.pushState({}, '', url);
+                },
+
+                loadFromUrl() {
+                    const url = new URL(window.location);
+                    this.view = url.searchParams.get('view') || 'all';
+                    this.cheapestCount = parseInt(url.searchParams.get('count')) || 10;
+                    
+                    switch(this.view) {
+                        case 'cheapest':
+                            this.fetchCheapestSlots();
+                            break;
+                        case 'tomorrow':
+                            this.fetchCheapestSlotsTomorrow();
+                            break;
+                        default:
+                            this.fetchAllSlots();
+                    }
+                },
+
+                groupAndColorSlots(slots) {
+                    const sortedByPrice = [...slots].sort((a, b) => a.value_inc_vat - b.value_inc_vat);
+                    const colorClasses = ['bg-green', 'bg-light-green', 'bg-yellow', 'bg-light-red', 'bg-red'];
+                    const segmentSize = Math.ceil(sortedByPrice.length / 5);
+                    const priceColorMap = new Map(
+                        sortedByPrice.map((slot, index) => [
+                            slot.value_inc_vat, 
+                            colorClasses[Math.floor(index / segmentSize)]
+                        ])
+                    );
+
+                    const currentDate = new Date();
+                    const today = currentDate.toLocaleDateString();
+                    const tomorrow = new Date(currentDate.setDate(currentDate.getDate() + 1)).toLocaleDateString();
+
+                    const grouped = {};
+                    slots.forEach((slot) => {
+                        const date = new Date(slot.valid_from);
+                        let dateKey = date.toLocaleDateString();
+                        if (dateKey === today) {
+                            dateKey = 'Today';
+                        } else if (dateKey === tomorrow) {
+                            dateKey = 'Tomorrow';
+                        }
+                        const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        if (!grouped[dateKey]) {
+                            grouped[dateKey] = [];
+                        }
+                        grouped[dateKey].push({
+                            time,
+                            value: parseFloat(slot.value_inc_vat).toFixed(1),
+                            colorClass: priceColorMap.get(slot.value_inc_vat)
+                        });
+                    });
+
+                    for (const date in grouped) {
+                        grouped[date].sort((a, b) => new Date('1970/01/01 ' + a.time) - new Date('1970/01/01 ' + b.time));
+                    }
+
+                    const orderedGrouped = {};
+                    if ('Today' in grouped) orderedGrouped['Today'] = grouped['Today'];
+                    if ('Tomorrow' in grouped) orderedGrouped['Tomorrow'] = grouped['Tomorrow'];
+                    Object.keys(grouped).sort().forEach(key => {
+                        if (key !== 'Today' && key !== 'Tomorrow') {
+                            orderedGrouped[key] = grouped[key];
+                        }
+                    });
+
+                    return orderedGrouped;
+                },
+
+                toggleApiDetails() {
+                    this.showApiDetails = !this.showApiDetails;
+                }
+            }
         }
-    </style>
+    </script>
 </body>
 </html>
