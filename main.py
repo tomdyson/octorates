@@ -2,7 +2,7 @@ import urllib.parse
 from datetime import datetime, timedelta, timezone
 
 import httpx
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -34,15 +34,18 @@ async def fetch_octopus_data():
             raise HTTPException(status_code=response.status_code, detail="Failed to fetch data from Octopus API")
 
 async def get_cached_data():
+    cache_used = True
     if cache["data"] is None or cache["last_updated"] is None or datetime.now() - cache["last_updated"] > timedelta(minutes=10):
         cache["data"] = await fetch_octopus_data()
         cache["last_updated"] = datetime.now()
-    return cache["data"]
+        cache_used = False
+    return cache["data"], cache_used
 
 @app.get("/api/all_slots")
-async def all_slots():
-    data = await get_cached_data()
+async def all_slots(response: Response):
+    data, cache_used = await get_cached_data()
     sorted_slots = sorted(data["results"], key=lambda x: x["valid_from"])
+    response.headers["CACHE_STATUS"] = "HIT" if cache_used else "MISS"
     return [
         {k: v for k, v in slot.items() if k != "payment_method"}
         for slot in sorted_slots
@@ -70,15 +73,17 @@ def get_cheapest_slots(slots, count: int):
     ]
 
 @app.get("/api/cheapest_slots/{count}")
-async def cheapest_slots(count: int):
+async def cheapest_slots(count: int, response: Response):
     validate_count(count)
-    data = await get_cached_data()
+    data, cache_used = await get_cached_data()
+    response.headers["CACHE_STATUS"] = "HIT" if cache_used else "MISS"
     return get_cheapest_slots(data["results"], count)
 
 @app.get("/api/cheapest_slots_tomorrow/{count}")
-async def cheapest_slots_tomorrow(count: int):
+async def cheapest_slots_tomorrow(count: int, response: Response):
     validate_count(count)
-    data = await get_cached_data()
+    data, cache_used = await get_cached_data()
+    response.headers["CACHE_STATUS"] = "HIT" if cache_used else "MISS"
     
     # Get tomorrow's date
     tomorrow = datetime.now(timezone.utc).date() + timedelta(days=1)
