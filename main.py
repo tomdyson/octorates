@@ -2,11 +2,13 @@ import urllib.parse
 from datetime import datetime, timedelta, timezone
 
 import httpx
+from circuitbreaker import circuit
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 
 class CacheControlMiddleware(BaseHTTPMiddleware):
@@ -35,19 +37,26 @@ cache = {"data": None, "last_updated": None}
 OCTOPUS_API_URL = "https://api.octopus.energy/v1/products/AGILE-FLEX-22-11-25/electricity-tariffs/E-1R-AGILE-FLEX-22-11-25-C/standard-unit-rates/"
 
 
+# Circuit breaker pattern: Stops calling the function after 5 consecutive failures,
+# and waits for 30 seconds before allowing retries
+@circuit(failure_threshold=5, recovery_timeout=30)
+# Retry mechanism: Attempts the function up to 3 times with exponential backoff
+# starting at 1 second, with a minimum of 4 seconds and maximum of 10 seconds between retries
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 async def fetch_octopus_data():
     current_time = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     params = {"period_from": current_time}
     url = f"{OCTOPUS_API_URL}?{urllib.parse.urlencode(params)}"
 
     async with httpx.AsyncClient() as client:
-        response = await client.get(url)
-        if response.status_code == 200:
+        try:
+            response = await client.get(url, timeout=10.0)
+            response.raise_for_status()
             return response.json()
-        else:
+        except (httpx.TimeoutException, httpx.HTTPStatusError) as e:
             raise HTTPException(
-                status_code=response.status_code,
-                detail="Failed to fetch data from Octopus API",
+                status_code=503,
+                detail=f"Failed to fetch data from Octopus API: {str(e)}",
             )
 
 
@@ -58,9 +67,14 @@ async def get_cached_data():
         or cache["last_updated"] is None
         or datetime.now() - cache["last_updated"] > timedelta(minutes=10)
     ):
-        cache["data"] = await fetch_octopus_data()
-        cache["last_updated"] = datetime.now()
-        cache_used = False
+        try:
+            new_data = await fetch_octopus_data()
+            cache["data"] = new_data
+            cache["last_updated"] = datetime.now()
+            cache_used = False
+        except HTTPException:
+            if cache["data"] is None:
+                raise  # Re-raise the exception if we don't have any cached data
     return cache["data"], cache_used
 
 
@@ -101,9 +115,13 @@ def get_cheapest_slots(slots, count: int):
 @app.get("/api/cheapest_slots/{count}")
 async def cheapest_slots(count: int, response: Response):
     validate_count(count)
-    data, cache_used = await get_cached_data()
-    response.headers["CACHE_STATUS"] = "HIT" if cache_used else "MISS"
-    return get_cheapest_slots(data["results"], count)
+    try:
+        data, cache_used = await get_cached_data()
+        response.headers["CACHE_STATUS"] = "HIT" if cache_used else "MISS"
+        return get_cheapest_slots(data["results"], count)
+    except HTTPException:
+        response.headers["CACHE_STATUS"] = "ERROR"
+        return [{"error": "Unable to fetch data, please try again later"}]
 
 
 @app.get("/api/cheapest_slots_tomorrow/{count}")
