@@ -1,6 +1,6 @@
 # OctoRates
 
-OctoRates is a web application that displays Octopus Agile electricity rates, allowing users to view all upcoming slots, the cheapest slots, or the cheapest slots for tomorrow.
+OctoRates is a simple API and web application that displays Octopus Agile electricity rates, allowing users to see all upcoming slots, the cheapest slots, or the cheapest slots for tomorrow.
 
 Live site: [https://octorates.tomd.org/](https://octorates.tomd.org/)
 
@@ -9,8 +9,8 @@ Live site: [https://octorates.tomd.org/](https://octorates.tomd.org/)
 - View all upcoming rate slots
 - Display cheapest slots (customizable number)
 - Show cheapest slots for tomorrow
-- API endpoints information
-- Caching of Octopus API data
+- API endpoints
+- Caches Octopus API data
 
 ## Prerequisites
 
@@ -114,6 +114,7 @@ To set up CI/CD for your fork of this project:
 - The backend uses FastAPI for efficient API routing and HTTPX for asynchronous HTTP requests
 - The app is containerized using Docker for easy deployment to fly.io
 - The application is automatically deployed to fly.io when changes are pushed to the main branch
+- This entire codebase was written by Claude 3.5 Sonnet
 
 ## License
 
