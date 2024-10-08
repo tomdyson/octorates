@@ -11,3 +11,4 @@ jobs:
         uses: joelwmale/webhook-action@2.3.2
         with:
           url: https://octorates.tomd.org/api/broadcast
+          method: GET
