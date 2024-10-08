@@ -1,8 +1,12 @@
+import json
+import os
 import urllib.parse
 from datetime import datetime, timedelta, timezone
 
 import httpx
+import paho.mqtt.client as mqtt
 from circuitbreaker import circuit
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -10,6 +14,15 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+# Load environment variables from .env file
+load_dotenv()
+
+# Replace the existing environment variable assignments with these:
+MQTT_BROKER = os.getenv("MQTT_BROKER")
+MQTT_PORT = int(os.getenv("MQTT_PORT", 1883))
+MQTT_TOPIC = os.getenv("MQTT_TOPIC", "octorates/prices")
+MQTT_USERNAME = os.getenv("MQTT_USERNAME")
+MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")
 
 class CacheControlMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: ASGIApp, cache_time: int = 3600):
@@ -36,12 +49,9 @@ cache = {"data": None, "last_updated": None}
 
 OCTOPUS_API_URL = "https://api.octopus.energy/v1/products/AGILE-FLEX-22-11-25/electricity-tariffs/E-1R-AGILE-FLEX-22-11-25-C/standard-unit-rates/"
 
-
 # Circuit breaker pattern: Stops calling the function after 5 consecutive failures,
 # and waits for 30 seconds before allowing retries
 @circuit(failure_threshold=5, recovery_timeout=30)
-# Retry mechanism: Attempts the function up to 3 times with exponential backoff
-# starting at 1 second, with a minimum of 4 seconds and maximum of 10 seconds between retries
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 async def fetch_octopus_data():
     current_time = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
@@ -50,8 +60,17 @@ async def fetch_octopus_data():
 
     async with httpx.AsyncClient() as client:
         try:
-            response = await client.get(url, timeout=10.0)
+            print(f"fetching data from {url}")
+            response = await client.get(url, timeout=10.0, headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+                "Accept": "application/json,text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.5",
+                "Accept-Encoding": "gzip, deflate, br",
+                "Connection": "keep-alive",
+                "Upgrade-Insecure-Requests": "1"
+            })
             response.raise_for_status()
+            print("got data")
             return response.json()
         except (httpx.TimeoutException, httpx.HTTPStatusError) as e:
             raise HTTPException(
@@ -150,3 +169,39 @@ async def cheapest_slots_tomorrow(count: int, response: Response):
 @app.get("/")
 async def root(request: Request):
     return FileResponse("static/index.html")
+
+
+
+@app.get("/api/broadcast")
+async def broadcast_prices():
+    data, _ = await get_cached_data()
+    sorted_slots = sorted(data["results"], key=lambda x: x["valid_from"])
+    
+    current_time = datetime.now(timezone.utc)
+    current_price = next(
+        (slot["value_inc_vat"] for slot in sorted_slots if datetime.fromisoformat(slot["valid_from"]) <= current_time < datetime.fromisoformat(slot["valid_to"])),
+        None
+    )
+    
+    all_prices = [
+        {
+            "valid_from": slot["valid_from"],
+            "value_inc_vat": slot["value_inc_vat"]
+        }
+        for slot in sorted_slots
+    ]
+    
+    message = {
+        "current_price": current_price,
+        "all_prices": all_prices
+    }
+    
+    try:
+        client = mqtt.Client()
+        client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+        client.connect(MQTT_BROKER, MQTT_PORT, 60)
+        client.publish(MQTT_TOPIC, json.dumps(message))
+        client.disconnect()
+        return {"status": "success", "message": "Prices broadcasted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to broadcast prices: {str(e)}")
