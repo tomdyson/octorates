@@ -7,8 +7,6 @@ jobs:
     name: Ping webhook
     runs-on: ubuntu-latest
     steps:
-      - name: Use webhook action to ping webhook
-        uses: joelwmale/webhook-action@2.3.2
-        with:
-          url: https://octorates.tomd.org/api/broadcast
-          method: GET
+      - name: ping webhook
+        run: |
+          curl -X GET "https://octorates.tomd.org/api/broadcast"
